@@ -24,6 +24,7 @@ function RootStack() {
         <Stack.Screen name="exchange/index" options={{ title: '구글 테스터 품앗이' }} />
         <Stack.Screen name="exchange/browse" options={{ title: '테스트할 앱 찾기' }} />
         <Stack.Screen name="exchange/[appId]" options={{ title: '내 앱 테스터' }} />
+        <Stack.Screen name="credits" options={{ title: 'AI 이용권' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="login" options={{ title: '스토어레디' }} />

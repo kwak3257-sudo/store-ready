@@ -7,7 +7,7 @@ import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { withSupabase } from '@supabase/server';
 import { z } from 'zod';
 
-import { aiErrorResponse, checkUsage, FREE_MONTHLY_LIMIT, json, recordUsage } from '../_shared/ai-usage.ts';
+import { aiErrorResponse, checkUsage, json, recordUsage } from '../_shared/ai-usage.ts';
 
 const Analysis = z.object({
   summary: z.string().describe('반려 이유를 한두 문장으로 쉽게 설명'),
@@ -72,8 +72,8 @@ export default {
     if (!parsedInput.success) return json({ error: '반려 메일을 20자 이상 붙여 넣어 주세요.' }, 400);
     const { store, message, app } = parsedInput.data;
 
-    const used = await checkUsage(ctx.supabaseAdmin, userId);
-    if (used instanceof Response) return used;
+    const usage = await checkUsage(ctx.supabaseAdmin, userId);
+    if (usage instanceof Response) return usage;
 
     try {
       const response = await client.beta.messages.parse({
@@ -99,9 +99,9 @@ export default {
         return json({ error: '결과를 읽지 못했습니다. 다시 시도해 주세요.' }, 502);
       }
 
-      await recordUsage(ctx.supabaseAdmin, userId, 'rejection');
+      const after = await recordUsage(ctx.supabaseAdmin, userId, 'rejection', usage);
 
-      return json({ analysis: response.parsed_output, usage: { used: used + 1, limit: FREE_MONTHLY_LIMIT } });
+      return json({ analysis: response.parsed_output, usage: after });
     } catch (err) {
       return aiErrorResponse(err);
     }

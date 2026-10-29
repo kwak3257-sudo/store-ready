@@ -3,7 +3,11 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { AppProject, GeneratedListing, RejectionAnalysis, StoreId } from '@/lib/types';
 
-export type Usage = { used: number; limit: number };
+/** Free uses in the last 30 days, the free limit, and paid credits left. */
+export type Usage = { used: number; limit: number; credits: number };
+
+/** Whether another AI request is allowed: free uses left, or paid credits. */
+export const canUseAi = (u: Usage | null) => u === null || u.used < u.limit || u.credits > 0;
 
 export function isAiConfigured() {
   return Boolean(supabase);
@@ -66,14 +70,15 @@ export async function explainRejection(
 
 const FREE_MONTHLY_LIMIT = Number(process.env.EXPO_PUBLIC_FREE_MONTHLY_LIMIT ?? '5');
 
-/** AI uses by the signed-in user in the last 30 days (RLS limits rows to the user's own). */
+/** AI uses by the signed-in user in the last 30 days and their paid credits (RLS limits rows to the user's own). */
 export async function fetchUsage(): Promise<Usage | null> {
   if (!supabase) return null;
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { count, error } = await supabase
-    .from('listing_usage')
-    .select('id', { count: 'exact', head: true })
-    .gte('created_at', since);
-  if (error) return null;
-  return { used: count ?? 0, limit: FREE_MONTHLY_LIMIT };
+  const [{ count, error }, { data: ledger, error: ledgerError }] = await Promise.all([
+    supabase.from('listing_usage').select('id', { count: 'exact', head: true }).gte('created_at', since),
+    supabase.from('ai_credit_ledger').select('delta'),
+  ]);
+  if (error || ledgerError) return null;
+  const credits = (ledger as { delta: number }[]).reduce((sum, r) => sum + r.delta, 0);
+  return { used: count ?? 0, limit: FREE_MONTHLY_LIMIT, credits };
 }
