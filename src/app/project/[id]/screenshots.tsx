@@ -7,6 +7,7 @@ import { captureRef } from 'react-native-view-shot';
 
 import { Body, Button, Card, ChoiceRow, Danger, Field, Screen, Section } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { discardPhotos, keepPhoto, photoUri } from '@/lib/photos';
 import { useProject } from '@/lib/projects';
 import { SCREENSHOT_LIMITS, SCREENSHOT_SIZES } from '@/lib/store-specs';
 import { Screenshot } from '@/lib/types';
@@ -26,6 +27,7 @@ export default function ScreenshotsScreen() {
   const sizes = SCREENSHOT_SIZES.filter((s) => project?.stores.includes(s.store));
   const [sizeKey, setSizeKey] = useState(sizes[0]?.key ?? SCREENSHOT_SIZES[0].key);
   const [exporting, setExporting] = useState(false);
+  const [picking, setPicking] = useState(false);
   const frames = useRef<(ComponentRef<typeof View> | null)[]>([]);
 
   if (!project) return <Screen><Body>앱을 찾을 수 없어요.</Body></Screen>;
@@ -47,7 +49,16 @@ export default function ScreenshotsScreen() {
       quality: 1,
     });
     if (result.canceled) return;
-    setShots([...shots, ...result.assets.map((a) => ({ uri: a.uri, caption: '' }))].slice(0, 10));
+    setPicking(true);
+    try {
+      const room = Math.max(0, 10 - shots.length);
+      const kept = await Promise.all(result.assets.slice(0, room).map((a) => keepPhoto(a.uri)));
+      setShots([...shots, ...kept]);
+    } catch (e) {
+      Alert.alert('사진을 가져오지 못했어요', e instanceof Error ? e.message : String(e));
+    } finally {
+      setPicking(false);
+    }
   };
 
   const exportAll = async () => {
@@ -101,13 +112,13 @@ export default function ScreenshotsScreen() {
         </View>
       </Section>
 
-      <Button variant="secondary" label="앱 화면 사진 고르기" onPress={pick} />
+      <Button variant="secondary" label="앱 화면 사진 고르기" onPress={pick} loading={picking} />
       {shots.length > 0 && shots.length < limit.min ? (
         <Body style={{ color: Danger }}>이 스토어는 최소 {limit.min}장이 필요해요.</Body>
       ) : null}
 
       {shots.map((shot, i) => (
-        <Card key={`${shot.uri}-${i}`} style={{ gap: Spacing.two }}>
+        <Card key={`${shot.localName ?? shot.uri}-${i}`} style={{ gap: Spacing.two }}>
           <View
             ref={(r) => {
               frames.current[i] = r;
@@ -117,7 +128,7 @@ export default function ScreenshotsScreen() {
             <Text style={[styles.caption, { color: textColor }]} numberOfLines={3}>
               {shot.caption || '문구를 입력하세요'}
             </Text>
-            <Image source={{ uri: shot.uri }} style={styles.shot} resizeMode="contain" />
+            <Image source={{ uri: photoUri(shot) }} style={styles.shot} resizeMode="contain" />
           </View>
           <Field
             label={`${i + 1}번 문구`}
@@ -126,7 +137,14 @@ export default function ScreenshotsScreen() {
             placeholder="예: 버튼 한 번으로 물 마신 양 기록"
             onChangeText={(t) => setShots(shots.map((s, j) => (j === i ? { ...s, caption: t } : s)))}
           />
-          <Button variant="secondary" label="빼기" onPress={() => setShots(shots.filter((_, j) => j !== i))} />
+          <Button
+            variant="secondary"
+            label="빼기"
+            onPress={() => {
+              discardPhotos([shot]);
+              setShots(shots.filter((_, j) => j !== i));
+            }}
+          />
         </Card>
       ))}
 

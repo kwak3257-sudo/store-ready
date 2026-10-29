@@ -1,7 +1,7 @@
 import { Link, router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Body, Button, Card, Screen, Title } from '@/components/ui';
+import { Body, Button, Card, Danger, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
@@ -10,7 +10,7 @@ import { useProjects } from '@/lib/projects';
 import { STORE_LABELS } from '@/lib/types';
 
 export default function HomeScreen() {
-  const { projects, loaded } = useProjects();
+  const { projects, loaded, sync, syncNow } = useProjects();
   const theme = useTheme();
   const { session, signOut } = useAuth();
 
@@ -53,6 +53,18 @@ export default function HomeScreen() {
       {session ? (
         <View style={{ gap: Spacing.two }}>
           <Body secondary>{session.user.email}로 로그인됨</Body>
+          {sync.state === 'syncing' ? <Body secondary>서버에 저장하는 중…</Body> : null}
+          {sync.state === 'synced' ? (
+            <Body secondary>
+              서버에 저장됨 ({sync.at.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })})
+            </Body>
+          ) : null}
+          {sync.state === 'error' ? (
+            <>
+              <Body style={{ color: Danger }}>서버 저장 실패: {sync.message}</Body>
+              <Button variant="secondary" label="다시 시도" onPress={syncNow} />
+            </>
+          ) : null}
           <Button variant="secondary" label="로그아웃" onPress={signOut} />
         </View>
       ) : null}

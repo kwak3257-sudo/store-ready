@@ -27,7 +27,7 @@ Supabase가 로그인과 AI 서버를 맡습니다. Anthropic API 키는 서버�
 ```bash
 npx supabase login
 npx supabase link --project-ref <프로젝트-ref>
-npx supabase db push                                  # 사용량 기록 테이블 만들기
+npx supabase db push                                  # 사용량·앱 데이터 테이블, 스크린샷 저장소 만들기
 npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 npx supabase secrets set FREE_MONTHLY_LIMIT=5         # 선택, 기본 5회
 npx supabase functions deploy generate-listing
@@ -38,6 +38,8 @@ npx supabase functions deploy generate-listing
 `.env.example`을 `.env`로 복사하고 Supabase 주소와 publishable 키를 넣으세요. `.env`가 없으면 앱은 로그인 없이 휴대폰 안에서만 동작하고, AI 등록정보는 쓸 수 없습니다.
 
 **사용량 제한**: 로그인한 사용자만 AI를 부를 수 있고, 한 사람당 최근 30일 `FREE_MONTHLY_LIMIT`회(기본 5회), 1분에 3회까지입니다. 성공한 생성만 셉니다.
+
+**서버 저장**: 로그인하면 앱 데이터가 서버(`projects` 테이블)에 자동 저장되고, 고른 스크린샷 사진은 앱 전용 폴더에 복사된 뒤 서버(`screenshots` 저장소)에 백업됩니다. 인터넷이 없을 때도 그대로 쓸 수 있고, 다시 연결되면 마지막으로 고친 쪽 기준으로 맞춰집니다. 새 휴대폰에서 같은 이메일로 로그인하면 데이터와 사진을 내려받습니다. 처음 로그인하기 전에 만든 앱은 그 계정으로 옮겨지고, 다른 계정으로 로그인하면 휴대폰의 앱 목록이 비워집니다.
 
 ## 검사
 

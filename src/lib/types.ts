@@ -38,8 +38,13 @@ export type GeneratedListing = {
 };
 
 export type Screenshot = {
+  /** Where the picked image was when chosen. Only used as-is on web, where nothing is copied. */
   uri: string;
   caption: string;
+  /** File name inside the app's own photo folder, so the image survives the gallery copy being deleted. */
+  localName?: string;
+  /** Path in the server's screenshots bucket once backed up. */
+  remotePath?: string;
 };
 
 export type AppProject = {
