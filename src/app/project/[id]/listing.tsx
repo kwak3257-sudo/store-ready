@@ -1,10 +1,11 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
 import { Body, Button, Card, ChoiceRow, CopyBlock, Danger, Screen, Section } from '@/components/ui';
+import { UsageLine } from '@/components/usage-line';
 import { Spacing } from '@/constants/theme';
-import { AiError, fetchUsage, generateListing, isAiConfigured, Usage } from '@/lib/api';
+import { AiError, canUseAi, fetchUsage, generateListing, isAiConfigured, Usage } from '@/lib/api';
 import { useProject } from '@/lib/projects';
 import { TEXT_LIMITS } from '@/lib/store-specs';
 
@@ -18,9 +19,12 @@ export default function ListingScreen() {
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
 
-  useEffect(() => {
-    fetchUsage().then(setUsage);
-  }, []);
+  // Refresh on return, e.g. after buying credits.
+  useFocusEffect(
+    useCallback(() => {
+      fetchUsage().then(setUsage);
+    }, []),
+  );
 
   if (!project) return <Screen><Body>앱을 찾을 수 없어요.</Body></Screen>;
 
@@ -54,16 +58,12 @@ export default function ListingScreen() {
         </Card>
       ) : null}
 
-      {usage ? (
-        <Body secondary>
-          최근 30일 AI 무료 사용량 {usage.used}/{usage.limit}회
-        </Body>
-      ) : null}
+      <UsageLine usage={usage} />
       <Button
         label={listing ? '다시 만들기' : '등록정보 만들기'}
         onPress={run}
         loading={loading}
-        disabled={usage !== null && usage.used >= usage.limit}
+        disabled={!canUseAi(usage)}
       />
       {error ? <Body style={{ color: Danger }}>{error}</Body> : null}
 

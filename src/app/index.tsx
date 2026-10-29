@@ -56,6 +56,7 @@ export default function HomeScreen() {
       {session ? (
         <View style={{ gap: Spacing.two }}>
           <Body secondary>{session.user.email}로 로그인됨</Body>
+          <Button variant="secondary" label="AI 이용권" onPress={() => router.push('/credits')} />
           {sync.state === 'syncing' ? <Body secondary>서버에 저장하는 중…</Body> : null}
           {sync.state === 'synced' ? (
             <Body secondary>

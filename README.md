@@ -44,6 +44,24 @@ npx supabase functions deploy explain-rejection
 
 **구글 테스터 품앗이**: 2023년 11월 13일 이후 만든 개인 개발자 계정은 정식 출시 전에 테스터 12명이 14일 연속 참여한 비공개 테스트가 필요합니다. 홈 화면의 "구글 테스터 품앗이"에서 개발자끼리 서로 테스트해 줍니다. 순서: 테스터가 참여 신청(Gmail 전달) → 앱 주인이 플레이 콘솔 테스터 명단에 넣고 "넣었어요" → 테스터가 참여 링크로 설치하고 "설치했어요" → 매일 "오늘 열어봤어요". 앱 주인 화면에서 12명 이상이 며칠 연속인지 보여 줍니다(테스터가 누른 기록 기준의 예상치). 다른 앱을 많이 테스트하는 사람의 앱이 목록 위에 보입니다. 모든 변경은 DB 함수로만 하고, Gmail은 내가 참여한 앱의 주인에게만 보입니다.
 
+## 결제 (AI 이용권, 인앱 결제)
+
+무료 사용량(30일 5회)을 다 쓰면 스토어 인앱 결제로 산 이용권이 1회씩 쓰입니다. 소모성 상품 하나(`launch_pass`, 기본 20회)로 시작합니다.
+
+1. **상품 등록**: 플레이 콘솔(수익 창출 > 인앱 상품)과 App Store Connect(앱 내 구입, 소모품)에 같은 ID `launch_pass`로 만들고 가격을 정합니다. 여러 개면 `.env`의 `EXPO_PUBLIC_IAP_PRODUCT_IDS`에 쉼표로 적고, 상품별 횟수는 서버의 `IAP_PRODUCT_CREDITS`(예: `{"launch_pass":20,"pack_50":50}`)로 정합니다.
+2. **구글 확인용 키**: Google Cloud에서 서비스 계정을 만들고 JSON 키를 받은 뒤, 플레이 콘솔 > 사용자 및 권한에서 그 계정에 "재무 데이터 보기"·"주문 관리" 권한을 줍니다.
+3. **애플 확인용 키**: App Store Connect > 사용자 및 액세스 > 통합 > 앱 내 구입에서 키(.p8)를 만들고 Key ID와 Issuer ID를 적어 둡니다.
+4. 서버 설정:
+   ```bash
+   npx supabase secrets set IAP_PRODUCT_CREDITS='{"launch_pass":20}'
+   npx supabase secrets set ANDROID_PACKAGE_NAME=<패키지 이름> GOOGLE_SERVICE_ACCOUNT_JSON="$(cat service-account.json)"
+   npx supabase secrets set APPLE_BUNDLE_ID=<번들 ID> APPLE_IAP_ISSUER_ID=<Issuer ID> APPLE_IAP_KEY_ID=<Key ID> APPLE_IAP_PRIVATE_KEY="$(cat SubscriptionKey_XXXX.p8)"
+   npx supabase functions deploy verify-purchase
+   ```
+5. `app.json`에 `ios.bundleIdentifier`와 `android.package`를 넣고 `npx eas-cli@latest build --profile development`로 개발용 빌드를 만들어 시험합니다. **Expo Go와 웹에서는 결제가 열리지 않습니다.** 구글은 라이선스 테스터, 애플은 샌드박스 계정으로 실제 돈 없이 시험할 수 있습니다.
+
+결제가 끝나면 앱이 서버(`verify-purchase`)에 보내고, 서버가 구글/애플에 직접 물어 확인한 뒤 이용권을 넣습니다. 서버 확인이 끝나야 결제를 마무리(소모)하므로, 중간에 앱이 꺼져도 다음에 이용권 화면을 열면 다시 확인합니다. 같은 구매는 한 번만, 산 계정에만 들어갑니다.
+
 ## 검사
 
 ```bash

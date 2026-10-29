@@ -1,11 +1,12 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Body, Button, Card, ChoiceRow, CopyBlock, Danger, Field, Screen, Section, Toggle } from '@/components/ui';
+import { UsageLine } from '@/components/usage-line';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { AiError, explainRejection, fetchUsage, isAiConfigured, Usage } from '@/lib/api';
+import { AiError, canUseAi, explainRejection, fetchUsage, isAiConfigured, Usage } from '@/lib/api';
 import { useProject } from '@/lib/projects';
 import { RejectionNote, STORE_LABELS, StoreId } from '@/lib/types';
 
@@ -26,9 +27,12 @@ export default function RejectionScreen() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchUsage().then(setUsage);
-  }, []);
+  // Refresh on return, e.g. after buying credits.
+  useFocusEffect(
+    useCallback(() => {
+      fetchUsage().then(setUsage);
+    }, []),
+  );
 
   if (!project) return <Screen><Body>앱을 찾을 수 없어요.</Body></Screen>;
 
@@ -67,8 +71,6 @@ export default function RejectionScreen() {
       { text: '지우기', style: 'destructive', onPress: () => setNotes(notes.filter((n) => n.id !== note.id)) },
     ]);
 
-  const outOfQuota = usage !== null && usage.used >= usage.limit;
-
   return (
     <Screen>
       <Body secondary>
@@ -99,16 +101,12 @@ export default function RejectionScreen() {
         placeholder="예: Guideline 4.2 - Design - Minimum Functionality ..."
       />
 
-      {usage ? (
-        <Body secondary>
-          최근 30일 AI 무료 사용량 {usage.used}/{usage.limit}회
-        </Body>
-      ) : null}
+      <UsageLine usage={usage} />
       <Button
         label="원인 분석하기"
         onPress={run}
         loading={loading}
-        disabled={message.trim().length < 20 || outOfQuota}
+        disabled={message.trim().length < 20 || !canUseAi(usage)}
       />
       {error ? <Body style={{ color: Danger }}>{error}</Body> : null}
 
