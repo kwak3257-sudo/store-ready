@@ -1,10 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { Body, Button, Card, ChoiceRow, CopyBlock, Danger, Screen, Section } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { generateListing, isListingApiConfigured } from '@/lib/api';
+import { fetchUsage, generateListing, isListingApiConfigured, ListingError, Usage } from '@/lib/api';
 import { useProject } from '@/lib/projects';
 import { TEXT_LIMITS } from '@/lib/store-specs';
 
@@ -16,6 +16,11 @@ export default function ListingScreen() {
   const [lang, setLang] = useState<Lang>('ko');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<Usage | null>(null);
+
+  useEffect(() => {
+    fetchUsage().then(setUsage);
+  }, []);
 
   if (!project) return <Screen><Body>앱을 찾을 수 없어요.</Body></Screen>;
 
@@ -23,9 +28,12 @@ export default function ListingScreen() {
     setLoading(true);
     setError(null);
     try {
-      update({ listing: await generateListing(project) });
+      const result = await generateListing(project);
+      update({ listing: result.listing });
+      if (result.usage) setUsage(result.usage);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      if (e instanceof ListingError && e.usage) setUsage(e.usage);
     } finally {
       setLoading(false);
     }
@@ -42,11 +50,21 @@ export default function ListingScreen() {
 
       {!isListingApiConfigured() ? (
         <Card style={{ borderLeftWidth: 4, borderLeftColor: Danger }}>
-          <Body>AI 서버가 아직 연결되지 않았어요. README의 "서버 설정"을 따라 EXPO_PUBLIC_LISTING_API_URL을 넣어 주세요.</Body>
+          <Body>AI 서버가 아직 연결되지 않았어요. README의 "서버 설정"을 따라 Supabase 주소와 키를 넣어 주세요.</Body>
         </Card>
       ) : null}
 
-      <Button label={listing ? '다시 만들기' : '등록정보 만들기'} onPress={run} loading={loading} />
+      {usage ? (
+        <Body secondary>
+          최근 30일 무료 사용량 {usage.used}/{usage.limit}회
+        </Body>
+      ) : null}
+      <Button
+        label={listing ? '다시 만들기' : '등록정보 만들기'}
+        onPress={run}
+        loading={loading}
+        disabled={usage !== null && usage.used >= usage.limit}
+      />
       {error ? <Body style={{ color: Danger }}>{error}</Body> : null}
 
       {listing && l ? (

@@ -1,10 +1,12 @@
 // Supabase Edge Function: writes store listing copy for an app with Claude.
 // The Anthropic API key stays here on the server; the mobile app never sees it.
+// Only signed-in users can call it, and each user gets FREE_MONTHLY_LIMIT generations per 30 days.
 //   supabase secrets set ANTHROPIC_API_KEY=...
 //   supabase functions deploy generate-listing
 
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { withSupabase } from '@supabase/server';
 import { z } from 'zod';
 
 const LocalizedListing = z.object({
@@ -53,54 +55,86 @@ const SYSTEM = `당신은 한국 앱 개발자의 앱스토어 출시를 돕는 
 
 const client = new Anthropic();
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
-};
+const FREE_MONTHLY_LIMIT = Number(Deno.env.get('FREE_MONTHLY_LIMIT') ?? '5');
+const PER_MINUTE_LIMIT = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return Response.json(body, { status });
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return json({ error: 'POST만 지원합니다.' }, 405);
+export default {
+  fetch: withSupabase({ auth: 'user' }, async (req, ctx) => {
+    if (req.method !== 'POST') return json({ error: 'POST만 지원합니다.' }, 405);
+    const userId = ctx.userClaims?.id;
+    if (!userId) return json({ error: '로그인이 필요합니다.' }, 401);
 
-  const parsedInput = Input.safeParse(await req.json().catch(() => null));
-  if (!parsedInput.success) return json({ error: '앱 정보 형식이 올바르지 않습니다.' }, 400);
-  const app = parsedInput.data;
+    const parsedInput = Input.safeParse(await req.json().catch(() => null));
+    if (!parsedInput.success) return json({ error: '앱 정보 형식이 올바르지 않습니다.' }, 400);
+    const app = parsedInput.data;
 
-  try {
-    const response = await client.beta.messages.parse({
-      model: 'claude-opus-5-5',
-      max_tokens: 16000,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: 'medium', format: betaZodOutputFormat(Listing) },
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      system: SYSTEM,
-      messages: [{ role: 'user', content: `앱 정보:\n${JSON.stringify(app, null, 2)}` }],
-    });
+    // supabaseAdmin bypasses RLS, so every query below filters on the caller's id.
+    const countSince = async (since: Date) => {
+      const { count, error } = await ctx.supabaseAdmin
+        .from('listing_usage')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', since.toISOString());
+      if (error) throw error;
+      return count ?? 0;
+    };
 
-    if (response.stop_reason === 'refusal') {
-      return json({ error: '이 앱 정보로는 등록정보를 만들 수 없습니다. 내용을 바꿔 다시 시도해 주세요.' }, 422);
+    let used: number;
+    try {
+      used = await countSince(new Date(Date.now() - 30 * DAY_MS));
+      if (used >= FREE_MONTHLY_LIMIT) {
+        return json(
+          { error: `최근 30일 무료 사용량(${FREE_MONTHLY_LIMIT}회)을 모두 썼습니다.`, usage: { used, limit: FREE_MONTHLY_LIMIT } },
+          429,
+        );
+      }
+      if ((await countSince(new Date(Date.now() - 60 * 1000))) >= PER_MINUTE_LIMIT) {
+        return json({ error: '너무 자주 요청했습니다. 1분 뒤에 다시 시도해 주세요.' }, 429);
+      }
+    } catch (err) {
+      console.error('usage check failed', err);
+      return json({ error: '사용량을 확인하지 못했습니다.' }, 500);
     }
-    if (!response.parsed_output) {
-      return json({ error: '결과를 읽지 못했습니다. 다시 시도해 주세요.' }, 502);
+
+    try {
+      const response = await client.beta.messages.parse({
+        model: 'claude-opus-5-5',
+        max_tokens: 16000,
+        thinking: { type: 'adaptive' },
+        output_config: { effort: 'medium', format: betaZodOutputFormat(Listing) },
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        system: SYSTEM,
+        messages: [{ role: 'user', content: `앱 정보:\n${JSON.stringify(app, null, 2)}` }],
+      });
+
+      if (response.stop_reason === 'refusal') {
+        return json({ error: '이 앱 정보로는 등록정보를 만들 수 없습니다. 내용을 바꿔 다시 시도해 주세요.' }, 422);
+      }
+      if (!response.parsed_output) {
+        return json({ error: '결과를 읽지 못했습니다. 다시 시도해 주세요.' }, 502);
+      }
+
+      // Only successful generations count toward the limit.
+      const { error: insertError } = await ctx.supabaseAdmin.from('listing_usage').insert({ user_id: userId });
+      if (insertError) console.error('usage insert failed', insertError);
+
+      return json({ listing: response.parsed_output, usage: { used: used + 1, limit: FREE_MONTHLY_LIMIT } });
+    } catch (err) {
+      if (err instanceof Anthropic.RateLimitError) {
+        return json({ error: '요청이 많습니다. 잠시 후 다시 시도해 주세요.' }, 429);
+      }
+      if (err instanceof Anthropic.APIError) {
+        console.error('Anthropic API error', err.status, err.message);
+        return json({ error: 'AI 서버 오류가 발생했습니다.' }, 502);
+      }
+      console.error(err);
+      return json({ error: '알 수 없는 오류가 발생했습니다.' }, 500);
     }
-    return json({ listing: response.parsed_output });
-  } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) {
-      return json({ error: '요청이 많습니다. 잠시 후 다시 시도해 주세요.' }, 429);
-    }
-    if (err instanceof Anthropic.APIError) {
-      console.error('Anthropic API error', err.status, err.message);
-      return json({ error: 'AI 서버 오류가 발생했습니다.' }, 502);
-    }
-    console.error(err);
-    return json({ error: '알 수 없는 오류가 발생했습니다.' }, 500);
-  }
-});
+  }),
+};

@@ -10,7 +10,7 @@
 - **스크린샷 만들기**: 앱 화면 캡처에 문구와 배경을 얹어 스토어 규격(구글 1080×1920, 아이폰 6.9인치 1320×2868, 6.1인치 1179×2556) JPG로 저장
 - **출시 체크리스트**: 스토어별 단계, 반려되기 쉬운 단계 강조 (구글 테스터 12명·14일, 애플 4.2 웹뷰 반려 위험 등)
 
-앱 데이터는 지금은 휴대폰 안(AsyncStorage)에만 저장됩니다.
+앱 데이터는 지금은 휴대폰 안(AsyncStorage)에만 저장됩니다. Supabase가 설정되면 이메일 코드로 로그인해야 앱을 쓸 수 있습니다.
 
 ## 실행
 
@@ -20,18 +20,24 @@ cp .env.example .env   # 서버 주소 입력
 npx expo start         # Expo Go 앱으로 QR 코드 스캔
 ```
 
-## 서버 설정 (등록정보 생성)
+## 서버 설정 (로그인 + AI 등록정보)
 
-Anthropic API 키가 앱 안에 들어가지 않도록 Supabase Edge Function에서 Claude API를 부릅니다.
+Supabase가 로그인과 AI 서버를 맡습니다. Anthropic API 키는 서버에만 두고 앱에는 넣지 않습니다.
 
 ```bash
-supabase functions deploy generate-listing
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+npx supabase login
+npx supabase link --project-ref <프로젝트-ref>
+npx supabase db push                                  # 사용량 기록 테이블 만들기
+npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+npx supabase secrets set FREE_MONTHLY_LIMIT=5         # 선택, 기본 5회
+npx supabase functions deploy generate-listing
 ```
 
-배포한 함수 주소와 anon 키를 `.env`에 넣으세요.
+**이메일 코드 로그인 설정**: Supabase 대시보드의 Authentication > Emails > Templates > Magic Link 템플릿에 `{{ .Token }}`을 넣어야 메일에 6자리 코드가 나옵니다. 예: `<p>인증 코드: {{ .Token }}</p>`
 
-> 주의: 지금은 로그인이 없어서 anon 키만 있으면 누구나 함수를 부를 수 있습니다. 공개 출시 전에 Supabase 로그인과 사용량 제한을 붙여야 합니다.
+`.env.example`을 `.env`로 복사하고 Supabase 주소와 publishable 키를 넣으세요. `.env`가 없으면 앱은 로그인 없이 휴대폰 안에서만 동작하고, AI 등록정보는 쓸 수 없습니다.
+
+**사용량 제한**: 로그인한 사용자만 AI를 부를 수 있고, 한 사람당 최근 30일 `FREE_MONTHLY_LIMIT`회(기본 5회), 1분에 3회까지입니다. 성공한 생성만 셉니다.
 
 ## 검사
 
