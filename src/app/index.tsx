@@ -24,6 +24,9 @@ export default function HomeScreen() {
       </View>
 
       <Button label="새 앱 등록하기" onPress={() => router.push('/new')} />
+      {session ? (
+        <Button variant="secondary" label="구글 테스터 품앗이 (12명·14일)" onPress={() => router.push('/exchange')} />
+      ) : null}
 
       {!loaded ? (
         <ActivityIndicator />

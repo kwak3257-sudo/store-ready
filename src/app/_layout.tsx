@@ -21,6 +21,9 @@ function RootStack() {
         <Stack.Screen name="project/[id]/screenshots" options={{ title: '스크린샷 만들기' }} />
         <Stack.Screen name="project/[id]/checklist" options={{ title: '출시 체크리스트' }} />
         <Stack.Screen name="project/[id]/rejection" options={{ title: '반려 해결 도우미' }} />
+        <Stack.Screen name="exchange/index" options={{ title: '구글 테스터 품앗이' }} />
+        <Stack.Screen name="exchange/browse" options={{ title: '테스트할 앱 찾기' }} />
+        <Stack.Screen name="exchange/[appId]" options={{ title: '내 앱 테스터' }} />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="login" options={{ title: '스토어레디' }} />
