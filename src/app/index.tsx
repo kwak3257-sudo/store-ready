@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Body, Button, Card, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/lib/auth';
 import { checklistProgress } from '@/lib/checklist';
 import { useProjects } from '@/lib/projects';
 import { STORE_LABELS } from '@/lib/types';
@@ -11,6 +12,7 @@ import { STORE_LABELS } from '@/lib/types';
 export default function HomeScreen() {
   const { projects, loaded } = useProjects();
   const theme = useTheme();
+  const { session, signOut } = useAuth();
 
   return (
     <Screen>
@@ -47,6 +49,13 @@ export default function HomeScreen() {
           })}
         </View>
       )}
+
+      {session ? (
+        <View style={{ gap: Spacing.two }}>
+          <Body secondary>{session.user.email}로 로그인됨</Body>
+          <Button variant="secondary" label="로그아웃" onPress={signOut} />
+        </View>
+      ) : null}
     </Screen>
   );
 }
