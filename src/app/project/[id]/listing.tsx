@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { Body, Button, Card, ChoiceRow, CopyBlock, Danger, Screen, Section } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { fetchUsage, generateListing, isListingApiConfigured, ListingError, Usage } from '@/lib/api';
+import { AiError, fetchUsage, generateListing, isAiConfigured, Usage } from '@/lib/api';
 import { useProject } from '@/lib/projects';
 import { TEXT_LIMITS } from '@/lib/store-specs';
 
@@ -33,7 +33,7 @@ export default function ListingScreen() {
       if (result.usage) setUsage(result.usage);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      if (e instanceof ListingError && e.usage) setUsage(e.usage);
+      if (e instanceof AiError && e.usage) setUsage(e.usage);
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export default function ListingScreen() {
         입력한 앱 정보로 스토어에 붙여 넣을 글을 만들어요. 1분 정도 걸릴 수 있어요. 결과는 꼭 읽어 보고, 실제와 다른 내용은 고쳐서 쓰세요.
       </Body>
 
-      {!isListingApiConfigured() ? (
+      {!isAiConfigured() ? (
         <Card style={{ borderLeftWidth: 4, borderLeftColor: Danger }}>
           <Body>AI 서버가 아직 연결되지 않았어요. README의 "서버 설정"을 따라 Supabase 주소와 키를 넣어 주세요.</Body>
         </Card>
@@ -56,7 +56,7 @@ export default function ListingScreen() {
 
       {usage ? (
         <Body secondary>
-          최근 30일 무료 사용량 {usage.used}/{usage.limit}회
+          최근 30일 AI 무료 사용량 {usage.used}/{usage.limit}회
         </Body>
       ) : null}
       <Button

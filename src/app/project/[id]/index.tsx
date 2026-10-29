@@ -42,6 +42,12 @@ export default function ProjectHomeScreen() {
       status: `${done}/${total}`,
       href: { pathname: '/project/[id]/checklist', params: { id: project.id } },
     },
+    {
+      title: '5. 반려됐을 때',
+      detail: '받은 반려 메시지를 붙여 넣으면 원인, 고칠 일, 심사관 답장 초안을 알려 드려요.',
+      status: project.rejections?.length ? `${project.rejections.length}건` : '필요할 때',
+      href: { pathname: '/project/[id]/rejection', params: { id: project.id } },
+    },
   ];
 
   return (

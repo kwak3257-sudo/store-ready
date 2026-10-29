@@ -37,6 +37,29 @@ export type GeneratedListing = {
   generatedAt: string;
 };
 
+export type RejectionAnalysis = {
+  summary: string;
+  guideline: string;
+  causes: { cause: string; evidence: string }[];
+  fixes: { where: string; action: string }[];
+  needsNewBuild: boolean;
+  nextStep: string;
+  nextStepReason: string;
+  replyEn: string;
+  replyKo: string;
+};
+
+/** A pasted rejection message and what the AI made of it. */
+export type RejectionNote = {
+  id: string;
+  store: StoreId;
+  message: string;
+  analysis: RejectionAnalysis;
+  /** Which fixes the user has ticked off, by index. */
+  done: Record<number, boolean>;
+  createdAt: string;
+};
+
 export type Screenshot = {
   /** Where the picked image was when chosen. Only used as-is on web, where nothing is copied. */
   uri: string;
@@ -62,6 +85,7 @@ export type AppProject = {
   listing?: GeneratedListing;
   screenshots: Screenshot[];
   screenshotBackground: string;
+  rejections?: RejectionNote[];
   checklist: Record<string, boolean>;
   createdAt: string;
   updatedAt: string;
