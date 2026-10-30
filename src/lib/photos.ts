@@ -50,6 +50,17 @@ export function removePhoto(shot: Screenshot) {
   }
 }
 
+/** Removes every photo kept on this phone, e.g. after the account is deleted. */
+export function clearPhotos() {
+  if (Platform.OS === 'web') return;
+  try {
+    const dir = new Directory(Paths.document, FOLDER);
+    if (dir.exists) dir.delete();
+  } catch {
+    // Nothing left to clean up.
+  }
+}
+
 const BUCKET = 'screenshots';
 
 /** Deletes screenshots on this phone and, when signed in, their server backups. Best effort. */

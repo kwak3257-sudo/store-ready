@@ -3,7 +3,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, u
 import { AppState } from 'react-native';
 
 import { useAuth } from '@/lib/auth';
-import { discardPhotos } from '@/lib/photos';
+import { clearPhotos, discardPhotos } from '@/lib/photos';
 import { applySync, syncProjects, Tombstones } from '@/lib/sync';
 import { AppProject, EMPTY_DATA_USAGE } from '@/lib/types';
 
@@ -41,6 +41,8 @@ type ProjectsContextValue = {
   deleteProject: (id: string) => void;
   sync: SyncStatus;
   syncNow: () => void;
+  /** Forgets every project, deletion record and photo on this phone. */
+  clearLocal: () => Promise<void>;
 };
 
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
@@ -176,9 +178,17 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     runSync();
   }, [runSync]);
 
+  const clearLocal = useCallback(async () => {
+    setProjects([]);
+    setTombstones({});
+    setOwner(null);
+    clearPhotos();
+    await AsyncStorage.multiRemove([STORAGE_KEY, TOMBSTONES_KEY, OWNER_KEY]).catch(() => {});
+  }, []);
+
   return (
     <ProjectsContext.Provider
-      value={{ projects, loaded, createProject, updateProject, deleteProject, sync, syncNow }}>
+      value={{ projects, loaded, createProject, updateProject, deleteProject, sync, syncNow, clearLocal }}>
       {children}
     </ProjectsContext.Provider>
   );
