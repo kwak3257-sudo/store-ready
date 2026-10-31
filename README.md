@@ -32,6 +32,7 @@ npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 npx supabase secrets set FREE_MONTHLY_LIMIT=5         # 선택, 기본 5회
 npx supabase functions deploy generate-listing
 npx supabase functions deploy explain-rejection
+npx supabase functions deploy delete-account
 ```
 
 **이메일 코드 로그인 설정**: Supabase 대시보드의 Authentication > Emails > Templates > Magic Link 템플릿에 `{{ .Token }}`을 넣어야 메일에 6자리 코드가 나옵니다. 예: `<p>인증 코드: {{ .Token }}</p>`
@@ -43,6 +44,8 @@ npx supabase functions deploy explain-rejection
 **서버 저장**: 로그인하면 앱 데이터가 서버(`projects` 테이블)에 자동 저장되고, 고른 스크린샷 사진은 앱 전용 폴더에 복사된 뒤 서버(`screenshots` 저장소)에 백업됩니다. 인터넷이 없을 때도 그대로 쓸 수 있고, 다시 연결되면 마지막으로 고친 쪽 기준으로 맞춰집니다. 새 휴대폰에서 같은 이메일로 로그인하면 데이터와 사진을 내려받습니다. 처음 로그인하기 전에 만든 앱은 그 계정으로 옮겨지고, 다른 계정으로 로그인하면 휴대폰의 앱 목록이 비워집니다.
 
 **구글 테스터 품앗이**: 2023년 11월 13일 이후 만든 개인 개발자 계정은 정식 출시 전에 테스터 12명이 14일 연속 참여한 비공개 테스트가 필요합니다. 홈 화면의 "구글 테스터 품앗이"에서 개발자끼리 서로 테스트해 줍니다. 순서: 테스터가 참여 신청(Gmail 전달) → 앱 주인이 플레이 콘솔 테스터 명단에 넣고 "넣었어요" → 테스터가 참여 링크로 설치하고 "설치했어요" → 매일 "오늘 열어봤어요". 앱 주인 화면에서 12명 이상이 며칠 연속인지 보여 줍니다(테스터가 누른 기록 기준의 예상치). 다른 앱을 많이 테스트하는 사람의 앱이 목록 위에 보입니다. 모든 변경은 DB 함수로만 하고, Gmail은 내가 참여한 앱의 주인에게만 보입니다.
+
+**회원 탈퇴**: 홈 > 내 계정에서 탈퇴하면 서버(`delete-account`)가 그 사람의 스크린샷 백업과 계정을 지우고, 계정에 딸린 앱 데이터·사용 기록·이용권·품앗이 기록도 함께 지워집니다. 휴대폰에 남은 앱 목록과 사진도 지웁니다. 애플 심사 규정(5.1.1(v))상 계정을 만들 수 있는 앱은 앱 안에서 탈퇴할 수 있어야 합니다.
 
 ## 결제 (AI 이용권, 인앱 결제)
 
@@ -65,5 +68,8 @@ npx supabase functions deploy explain-rejection
 ## 검사
 
 ```bash
-npx tsc --noEmit
+npm run typecheck   # 타입 검사
+npm test            # 자동 테스트 (동기화, 테스터 14일 계산, 체크리스트, 개인정보처리방침, 사용량)
 ```
+
+GitHub에 올리면 같은 검사가 자동으로 돌아갑니다(`.github/workflows/ci.yml`).

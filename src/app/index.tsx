@@ -12,7 +12,7 @@ import { STORE_LABELS } from '@/lib/types';
 export default function HomeScreen() {
   const { projects, loaded, sync, syncNow } = useProjects();
   const theme = useTheme();
-  const { session, signOut } = useAuth();
+  const { session } = useAuth();
 
   return (
     <Screen>
@@ -69,7 +69,7 @@ export default function HomeScreen() {
               <Button variant="secondary" label="다시 시도" onPress={syncNow} />
             </>
           ) : null}
-          <Button variant="secondary" label="로그아웃" onPress={signOut} />
+          <Button variant="secondary" label="내 계정 (로그아웃·회원 탈퇴)" onPress={() => router.push('/account')} />
         </View>
       ) : null}
     </Screen>

@@ -1,4 +1,4 @@
-import { Session } from '@supabase/supabase-js';
+import { FunctionsHttpError, Session } from '@supabase/supabase-js';
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
@@ -12,6 +12,8 @@ type AuthContextValue = {
   sendCode: (email: string) => Promise<void>;
   verifyCode: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Deletes the account and all server data. The caller clears what is stored on the phone. */
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -49,8 +51,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase?.auth.signOut();
   };
 
+  const deleteAccount = async () => {
+    const client = requireClient();
+    const { error } = await client.functions.invoke('delete-account', { method: 'POST' });
+    if (error) {
+      const body =
+        error instanceof FunctionsHttpError
+          ? ((await (error.context as Response).json().catch(() => null)) as { error?: string } | null)
+          : null;
+      throw new Error(body?.error ?? '계정을 지우지 못했습니다. 인터넷 연결을 확인하세요.');
+    }
+    // The account is gone on the server, so only the session on this phone is left to drop.
+    await client.auth.signOut({ scope: 'local' });
+  };
+
   return (
-    <AuthContext.Provider value={{ ready, session, required: Boolean(supabase), sendCode, verifyCode, signOut }}>
+    <AuthContext.Provider value={{ ready, session, required: Boolean(supabase), sendCode, verifyCode, signOut, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );
